@@ -1,0 +1,153 @@
+#!/bin/sh
+
+drush_cmd=`which drush`
+site_dir=${PWD##*/}
+
+QUIET=
+VERBOSE=
+DEBUG=
+DRUSH_VERBOSITY='-q'
+CREATE=
+IGNORE_ERRORS=
+
+print_usage() {
+  echo
+  echo "  -h | --help               Prints this help and exits."
+  echo "  -v | --verbose            Enable verbose output"
+  echo "  -d | --debug              Enable debug output and sets drush to verbose"
+  echo "  -q | --quiet              Disable most of the output"
+  # echo "  -n | --no                 Assumes 'no' as answer"
+  # echo "  -y | --yes                Assumes 'yes' as answer"
+  echo "  -c | --create-file-dir    Creates the 'files' (and 'private') directory if "
+  echo "                             they are missing. By dedault it just warns."
+  echo "  -f | --force              Continues even if an error occurs" 
+  echo
+}
+
+print_message() {
+  case $1 in
+  info)
+    if [ -n "$VERBOSE" ]; then
+      echo "$2"
+    fi
+    ;;
+  notice)
+    if [ -z "$QUIET" ]; then
+      echo "$2"
+    fi
+  ;;
+  warning)
+    if [ -z "$QUIET" ]; then
+      echo "[WARNING] $2" 1>&2
+    fi
+  ;;
+  error)
+    echo "" 1>&2
+    echo "[ERROR] $2" 1>&2
+    echo "" 1>&2
+
+    if [ -z $IGNORE_ERRORS]; then
+      exit -1
+    fi
+  ;;
+  *)
+    if [ -z $QUIET ]; then
+      echo "[$1] $2"
+    fi
+  ;;
+  esac
+}
+
+while true; do
+  case "$1" in
+    -h | --help )             print_usage; exit;;
+
+    -v | --verbose )          VERBOSE=true; DRUSH_VERBOSITY=''; shift;;
+    -d | --debug )            DEBUG=true; VERBOSE=true; DRUSH_VERBOSITY='-v' shift;;
+    -q | --quiet )            QUIET=true; shift;;
+
+    # -n | --no )               ASSUME_NO=true; ASSUME_YES=''; shift;;
+    # -y | --yes )              ASSUME_YES=true; ASSUME_NO=''; shift;;
+
+    -c | --create-file-dir )  CREATE=true; shift;;
+    -f | --force )            IGNORE_ERRORS=true; shift;;
+
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+# Check for drush command
+if [ ! -x "$drush_cmd" ]; then
+  print_message error "drush command not found"
+  # In this case we exit even if "IGNORE_ERRORS" is enabled.
+  exit -10;
+fi;
+# Add verbosity level to drush. Default is quiet
+drush_cmd="$drush_cmd $DRUSH_VERBOSITY "
+
+
+# Check if the platform is correctly setup
+if [ ! -f '../platform.settings.php' ]; then
+  print_message warning "Missing sites/platform.settings.php file!"
+fi
+
+# Check if the site is correctly setup
+if [ ! -f 'settings.php' ]; then
+  print_message error "Missing sites/$site_dir/settings.php file!"
+fi
+
+# Check if the site files dirs are correctly setup
+if [ ! -d "../files/$site_dir" ]; then
+  print_message warning "Missing files directory in sites/files/$site_dir"
+
+  if [ -n $CREATE ]; then
+    `mkdir -p ../files/$site_dir/files ../files/$site_dir/private/files ../files/$site_dir/private/temp`
+  fi
+fi
+
+print_message notice "Starting cleanup process."
+
+print_message info "Rebuildilg Registry to update include paths"
+`$drush_cmd registry-rebuild`
+
+print_message info "Force clean cache tables"
+`$drush_cmd sql-query 'TRUNCATE TABLE cache;'`
+`$drush_cmd sql-query 'TRUNCATE TABLE cache_menu;'`
+`$drush_cmd sql-query 'TRUNCATE TABLE cache_views;'`
+
+`$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_file;'`
+`$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_node;'`
+`$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_taxonomy_term;'`
+
+print_message info "Disabling caching modules"
+`$drush_cmd pm-disable -y memcache memcache_admin varnish advagg apc_status render_cache apc expire`
+
+print_message info "Disabling SMTP"
+`$drush_cmd variable-set smtp_on 0`
+
+print_message info "Use devel as default mailsystem destination "
+`$drush_cmd variable-set mail_system '{"default-system":"DevelMailLog"}' --format=json`
+
+
+print_message notice "Enabling Development Modules"
+`$drush_cmd pm-enable -y devel stage_file_proxy maillog`
+
+# This shlould be on your settings.php!
+# Uncomment the next lines to extra safety.
+# echo "Disabling Drupal Cache"
+#`$drush_cmd variable-set cache 0`
+#`$drush_cmd variable-set block_cache 0`
+#`$drush_cmd variable-set cache_lifetime 0`
+#`$drush_cmd variable-set page_cache_maximum_age 0`
+#`$drush_cmd variable-set page_compression 0`
+#`$drush_cmd variable-set preprocess_css 0`
+#`$drush_cmd variable-set preprocess_js 0`
+
+print_message notice "Clean sessions table"
+`$drush_cmd sql-query 'TRUNCATE TABLE sessions;'`
+
+print_message notice "Loggin into the local site"
+echo `$drush_cmd user-login 1`
+
+print_message OK "Command completed!"
