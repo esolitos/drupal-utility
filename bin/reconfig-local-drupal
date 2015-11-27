@@ -9,6 +9,7 @@ DEBUG=
 DRUSH_VERBOSITY='-q'
 CREATE=
 IGNORE_ERRORS=
+AUTOLOGIN=false
 
 print_usage() {
   echo
@@ -19,6 +20,7 @@ print_usage() {
   echo "  -c | --create-file-dir    Creates the 'files' (and 'private') directory if "
   echo "                             they are missing. By dedault it just warns."
   echo "  -f | --force              Continues even if an error occurs" 
+  echo "  -l | --login              Automatic Login"
   echo
 }
 
@@ -83,6 +85,7 @@ while true; do
 
     -c | --create-file-dir )  CREATE=true; shift;;
     -f | --force )            IGNORE_ERRORS=true; shift;;
+    -l | --login )            AUTOLOGIN=true; shift;;
 
     -- ) shift; break ;;
     * ) break ;;
@@ -159,7 +162,9 @@ print_message notice "Enabling Development Modules"
 print_message notice "Clean sessions table"
 `$drush_cmd sql-query 'TRUNCATE TABLE sessions;'`
 
-print_message notice "Loggin into the local site"
-echo `$drush_cmd user-login 1`
+if $AUTOLOGIN; then
+  print_message notice "Loggin into the local site"
+  echo `$drush_cmd user-login 1`
+fi
 
 print_message OK "Command completed!"
