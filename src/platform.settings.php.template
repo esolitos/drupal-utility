@@ -1,0 +1,99 @@
+<?php
+
+/**
+ * This file contains most of the default settings that otherwise we will have to share among all the Media Sites
+ * 
+ */
+$conf['site_name'] = '*DEV* '.$site_name;
+$conf['site_mail'] = $your_email;
+$conf['site_slogan'] = empty($slogan) ? '' : $slogan;
+
+$conf['file_temporary_path']  = 'sites/files/'.$host.'/private/temp';
+$conf['file_public_path']     = 'sites/files/'.$host.'/files';
+$conf['file_private_path']    = 'sites/files/'.$host.'/private';
+
+if ( $real_host ) {
+  $real_host_directory = isset($real_host_directory) ? $real_host_directory : $real_host;
+  if ( isset($real_host_access) )
+    $conf['stage_file_proxy_origin'] = 'http://'.$real_host_access.'@'.$real_host;
+  else
+    $conf['stage_file_proxy_origin']      = 'http://'.$real_host;
+
+  $conf['stage_file_proxy_hotlink']     = FALSE;
+  $conf['stage_file_proxy_origin_dir']  = 'sites/'.$real_host_directory.'/files';
+}
+$update_free_access = FALSE;
+$drupal_hash_salt = 'you-should-really-change-this-but-on-the-other-hand-this-is-a-dev-site';
+
+$conf['cache'] = FALSE;
+$conf['block_cache'] = FALSE;
+$conf['cache_lifetime'] = 0;
+$conf['page_cache_maximum_age'] = 0;
+$conf['page_compression'] = FALSE;
+$conf['preprocess_css'] = FALSE;
+$conf['preprocess_js'] = FALSE;
+$conf['css_gzip_compression'] = FALSE;
+$conf['js_gzip_compression'] = FALSE;
+
+if (empty($default_db_user)) {
+  $default_db_user = 'ramsalt';
+  $default_db_password  = 'SUPERSTRONGPASSWORD!! ..or a weak one, it does not matter, I have a firewall..';
+}
+
+if (empty($db_host)) {
+  $db_host = 'localhost';
+}
+
+
+$databases = array (
+  'default' => array (
+    'default' => array (
+      'database' => $db_name,
+      'username' => $default_db_user,
+      'password' => $default_db_password,
+      'host' => $db_host,
+      'port' => '',
+      'driver' => 'mysql',
+      'prefix' => '',
+    ),
+  ),
+);
+
+/**
+ * Ramsalt Media Settings
+ */
+$conf['move_main_illustration_region'] = 'header';
+$conf['main_illustration_gallery_field'] = 'field_image_gallery';
+
+$conf['facebook-page'] = 'ramsaltlab';
+$conf['twitter-user-name'] = 'ramsalt';
+
+// Locally turning off SMTP by default
+$conf['smtp_on'] = FALSE;
+// Disable cron by default
+$conf['cron_safe_threshold'] = 0;
+// Enable theme debug if required.
+$conf['theme_debug'] = isset($enable_theme_debug) ? $enable_theme_debug : FALSE;
+
+$default_theme = ( !empty($custom_theme) ) ? $custom_theme : 'ramsalt_media';
+$conf['htmlmail_theme'] = $default_theme;
+$conf['mailsystem_theme'] = $default_theme;
+$conf['simplenews_from_name'] = $your_email;
+$conf['simplenews_test_address'] = $your_email;
+$conf['smtp_from'] = $your_email;
+$conf['smtp_fromname'] = $conf['site_name'];
+$conf['disqus_domain'] = 'disqus';
+
+/**
+ * PHP settings:
+ *
+ */
+$thirty_days = (60*60*24*30);
+
+ini_set('session.gc_probability', 1);
+ini_set('session.gc_divisor', 100);
+ini_set('session.gc_maxlifetime', $thirty_days);
+ini_set('session.cookie_lifetime', $thirty_days);
+
+ini_set('error_reporting', -1);
+
