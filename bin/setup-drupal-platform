@@ -8,16 +8,26 @@
 #
 #  TODO: Add options to also create/checkout a site from a git repository.
 
+set -e
+set -u
+set -o pipefail
+
 # Global variables
+DRY_RUN=
 QUIET=
 VERBOSE=
 DEBUG=
-DRUSH_VERBOSITY='-q'
-DRUSH_MAKE_OPTIONS=' --concurrency=5 --force-complete --working-copy '
 IGNORE_ERRORS=
 DEFAULT_ANSWER=
-FILES_DIRECTORY=
-DEFAULT_PLATFORM_SETTINGS=
+
+DRUSH_CMD=`which drush`
+DRUSH_VERBOSITY='-q'
+DRUSH_MAKE_OPTIONS=' --concurrency=5 --force-complete --working-copy --bundle-lockfile '
+
+COMMON_FILES_DIRECTORY="/var/www/common_drupal_site_files"
+DEFAULT_PLATFORM_SETTINGS_FILE="`dirname $0`/../src/platform.settings.php"
+DEFAULT_DRUPAL_SETTINGS_FILE="`dirname $0`/../src/settings.php"
+
 MAKEFILE_URI=
 PLATFORM_PATH=
 
@@ -36,8 +46,52 @@ print_usage() {
   echo "  -y | --yes                Assumes 'yes' as answer"
   echo "                             (Note: '-y' and '-n' are overriding each other, the latest parameter"
   echo "                              passed takes priority)"
-  echo "  -f | --force              Continues even if an error occurs" 
+  echo "  -f | --force              Continues even if an error occurs"
+  echo "  -x | --noop               Dry Run, do not execute the commands, just print them out (also assumes --debug)"
   echo
+}
+
+#######################################
+# Invokes a shell command or just prints it out if in dry run mode
+#
+# Globals:
+#   DRUSH_MAKE_OPTIONS
+# Arguments:
+#   any shell command
+# Returns:
+#   result of the command execution
+#######################################
+shell_execute() {
+  if [ -n "$DRY_RUN" ]; then
+    echo "DRY RUN: $1"
+  else
+    return `$1`
+  fi
+}
+
+#######################################
+# Invokes a drush command or just prints it out if in dry run mode
+#
+# Globals:
+#   DRUSH_MAKE_OPTIONS
+# Arguments:
+#   any shell command
+# Returns:
+#   result of the command execution
+#######################################
+drush_execute() {
+  # Check for drush command
+  if [ ! -x "$DRUSH_CMD" ]; then
+    print_message error "drush command not found"
+    # In this case we exit even if "IGNORE_ERRORS" is enabled.
+    exit -10;
+  fi;
+
+  if [ -n "$DRY_RUN" ]; then
+    echo "DRY RUN: drush $1"
+  else
+    return `$DRUSH_CMD $DRUSH_VERBOSITY $1`
+  fi
 }
 
 #######################################
@@ -60,31 +114,33 @@ print_usage() {
 print_message() {
   case $1 in
   info)
-    if [ -n "$VERBOSE" ]; then
-      echo "$2"
-    fi
-    ;;
-  notice)
-    if [ -z "$QUIET" ]; then
+    if [ -n "$VERBOSE" ] | [ -n "$DRY_RUN" ]; then
       echo "$2"
     fi
   ;;
+
+  notice)
+    if [ -z "$QUIET" ] | [ -n "$DRY_RUN" ]; then
+      echo "$2"
+    fi
+  ;;
+
   warning)
-    if [ -z "$QUIET" ]; then
+    if [ -z "$QUIET" ] | [ -n "$DRY_RUN" ]; then
       echo "[WARNING] $2" 1>&2
     fi
   ;;
+
   error)
-    echo "" 1>&2
     echo "[ERROR] $2" 1>&2
-    echo "" 1>&2
 
     if [ -z "$IGNORE_ERRORS" ]; then
       exit -1
     fi
   ;;
+
   *)
-    if [ -z "$QUIET" ]; then
+    if [ -z "$QUIET" ] | [ -n "$DRY_RUN" ]; then
       echo "[$1] $2"
     fi
   ;;
@@ -147,26 +203,27 @@ if [ $# -lt 2 ]; then
   exit -1
 else
   MAKEFILE_URI="$1"
-  PLATFORM_PATH="$1"
+  PLATFORM_PATH="$2"
   shift 2
 fi
 
 while true; do
-  case "$1" in
+  case ${1:-} in
     -h | --help )             print_usage; exit;;
 
     -v | --verbose )          VERBOSE=true; DRUSH_VERBOSITY=''; shift;;
-    -d | --debug )            DEBUG=true; VERBOSE=true; DRUSH_VERBOSITY='-v' shift;;
+    -d | --debug )            DEBUG=true; VERBOSE=true; DRUSH_VERBOSITY='-v'; echo "Debug-Mode Active"; shift;;
     -q | --quiet )            QUIET=true; shift;;
 
     -n | --no )               DEFAULT_ANSWER='-n'; shift;;
     -y | --yes )              DEFAULT_ANSWER='-y'; shift;;
 
     -f | --force )            IGNORE_ERRORS=true; shift;;
+    -x | --noop )             DRY_RUN=true; VERBOSE=true; shift;;
 
-    --files-path )            FILES_DIRECTORY="$2";
-                              if [ -z "$FILES_DIRECTORY" ]; then
-                                print_message error "The option '--files-path' requires you to specify a parameter"
+    --files-path )            COMMON_FILES_DIRECTORY="$2";
+                              if [ -z "$COMMON_FILES_DIRECTORY" ] | [ ! -d "$COMMON_FILES_DIRECTORY" ] | [ ! -w "$COMMON_FILES_DIRECTORY" ]; then
+                                print_message error "The option '--files-path' requires you to specify a valid writable directory"
                               fi
                               shift 2;;
 
@@ -175,37 +232,31 @@ while true; do
   esac
 done
 
-drush_cmd=`which drush`
-# Check for drush command
-if [ ! -x "$drush_cmd" ]; then
-  print_message error "drush command not found"
-  # In this case we exit even if "IGNORE_ERRORS" is enabled.
-  exit -10;
-fi;
-# Add verbosity level to drush. Default is quiet
-drush_cmd="$drush_cmd $DRUSH_VERBOSITY "
-
-# Check if the platform is correctly setup
-if [ ! -f '../platform.settings.php' ]; then
-  print_message warning "Missing sites/platform.settings.php file!"
-fi
-
-
 print_message notice "Starting platform creation process."
 
 # Running the actual drush make command
-`$drush_cmd $DRUSH_MAKE_OPTIONS $MAKEFILE_URI $PLATFORM_PATH`
+print_message info "Building Drupal platform in $PLATFORM_PATH"
+drush_execute "make $DRUSH_MAKE_OPTIONS $MAKEFILE_URI $PLATFORM_PATH"
 
-print_message debug "Copying platform Settings file to: $PLATFORM_PATH/sites/platform.settings.php"
-if [ ! -r "$DEFAULT_PLATFORM_SETTINGS" ]; then
-  #statements
+print_message info "Copying 'Platform Settings' file to the newly created platform."
+if [ -z "$DEFAULT_PLATFORM_SETTINGS_FILE" ] | [ ! -r "$DEFAULT_PLATFORM_SETTINGS_FILE" ]; then
+  print_message error "The 'Platform Settings' file does not exist or is not readable: $DEFAULT_PLATFORM_SETTINGS_FILE"
 fi
-cp "$DEFAULT_PLATFORM_SETTINGS" "$PLATFORM_PATH/sites/platform.settings.php"
+shell_execute "cp $DEFAULT_PLATFORM_SETTINGS_FILE $PLATFORM_PATH/sites/platform.settings.php"
 
-print_message debug "Symlinking common files directory to: $PLATFORM_PATH/sites/files/"
-if [ ! -d "$FILES_DIRECTORY" ]; then
+# if [ -z "$DEFAULT_DRUPAL_SETTINGS_FILE" ] | [ ! -r "$DEFAULT_DRUPAL_SETTINGS_FILE" ]; then
+#   print_message error "The default drupal settings file does not exist or is not readable."
+# fi
+# shell_execute "mkdir $PLATFORM_PATH/sites/platform-example/"
+# shell_execute "cp $DEFAULT_DRUPAL_SETTINGS_FILE $PLATFORM_PATH/sites/site-example/settings.php"
+
+print_message info "Symlink-ing common files directory to the newly created platform."
+if [ ! -d "$COMMON_FILES_DIRECTORY" ]; then
+  echo "$COMMON_FILES_DIRECTORY"
   print_message error "Given drupal files directory not found or not a directory."
 fi
-ln -s "$FILES_DIRECTORY" "$PLATFORM_PATH/sites/files"
+shell_execute "ln -s $COMMON_FILES_DIRECTORY $PLATFORM_PATH/sites/files"
 
-print_message OK "Command completed, your platform is "
+print_message OK "Command completed, you can now add sites in $PLATFORM_PATH/sites/"
+print_message OK "Consider using the $PLATFORM_PATH/sites/platform-example/settings.php file as base to setup your site"
+
