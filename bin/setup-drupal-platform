@@ -8,8 +8,8 @@
 #
 #  TODO: Add options to also create/checkout a site from a git repository.
 
-set -e
-set -u
+# set -e
+# set -u
 set -o pipefail
 
 # Global variables
