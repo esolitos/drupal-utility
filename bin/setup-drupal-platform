@@ -24,7 +24,7 @@ DRUSH_CMD=`which drush`
 DRUSH_VERBOSITY='-q'
 DRUSH_MAKE_OPTIONS=' --concurrency=5 --force-complete --working-copy --bundle-lockfile '
 
-COMMON_FILES_DIRECTORY="/var/www/common_drupal_site_files"
+COMMON_FILES_DIRECTORY="/var/www/common_drupal_site_files/"
 DEFAULT_PLATFORM_SETTINGS_FILE="`dirname $0`/../src/platform.settings.php"
 DEFAULT_DRUPAL_SETTINGS_FILE="`dirname $0`/../src/settings.php"
 
@@ -90,7 +90,7 @@ drush_execute() {
   if [ -n "$DRY_RUN" ]; then
     echo "DRY RUN: drush $1"
   else
-    `$DRUSH_CMD $DRUSH_VERBOSITY $1`
+    $DRUSH_CMD $DRUSH_VERBOSITY $1
   fi
 }
 
