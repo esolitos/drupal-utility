@@ -90,7 +90,7 @@ drush_execute() {
   if [ -n "$DRY_RUN" ]; then
     echo "DRY RUN: drush $1"
   else
-    return `$DRUSH_CMD $DRUSH_VERBOSITY $1`
+    `$DRUSH_CMD $DRUSH_VERBOSITY $1`
   fi
 }
 
