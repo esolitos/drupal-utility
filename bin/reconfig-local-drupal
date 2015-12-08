@@ -19,6 +19,7 @@ print_usage() {
   echo "  -q | --quiet              Disable most of the output"
   echo "  -c | --create-file-dir    Creates the 'files' (and 'private') directory if "
   echo "                             they are missing. By dedault it just warns."
+  echo "  -y | --yes                Assumes 'yes' to all drush confirmation messages" 
   echo "  -f | --force              Continues even if an error occurs" 
   echo "  -l | --login              Automatic Login"
   echo
@@ -84,6 +85,8 @@ while true; do
     -q | --quiet )            QUIET=true; shift;;
 
     -c | --create-file-dir )  CREATE=true; shift;;
+
+    -y | --yes )              DRUSH_ASSUME_YES='-y'; shift;;
     -f | --force )            IGNORE_ERRORS=true; shift;;
     -l | --login )            AUTOLOGIN=true; shift;;
 
@@ -99,7 +102,7 @@ if [ ! -x "$drush_cmd" ]; then
   exit -10;
 fi;
 # Add verbosity level to drush. Default is quiet
-drush_cmd="$drush_cmd $DRUSH_VERBOSITY "
+drush_cmd="$drush_cmd $DRUSH_VERBOSITY $DRUSH_ASSUME_YES"
 
 
 # Check if the platform is correctly setup
