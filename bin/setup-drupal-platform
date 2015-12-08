@@ -1,0 +1,262 @@
+#!/bin/sh
+#
+# Creates a platform form a makefile to a specific destiation dir, also taking
+#  care of symlinking drupal files directories and sopying the platform default
+#  settings.
+#
+# Reads default configuration from "/etc/drupal_platforms.conf" and "~/.drupal_platforms"
+#
+#  TODO: Add options to also create/checkout a site from a git repository.
+
+# set -e
+# set -u
+set -o pipefail
+
+# Global variables
+DRY_RUN=
+QUIET=
+VERBOSE=
+DEBUG=
+IGNORE_ERRORS=
+DEFAULT_ANSWER=
+
+DRUSH_CMD=`which drush`
+DRUSH_VERBOSITY='-q'
+DRUSH_MAKE_OPTIONS=' --concurrency=5 --force-complete --working-copy --bundle-lockfile '
+
+COMMON_FILES_DIRECTORY="/var/www/common_drupal_site_files/"
+DEFAULT_PLATFORM_SETTINGS_FILE="`dirname $0`/../src/platform.settings.php"
+DEFAULT_DRUPAL_SETTINGS_FILE="`dirname $0`/../src/settings.php"
+
+MAKEFILE_URI=
+PLATFORM_PATH=
+
+# Prints the hint on how to use this script
+print_usage() {
+  echo
+  echo "\$: `basename $0` uri://to/drush/makefile.make /path/to/destination/directory [options]"
+  echo
+  echo "Valid optins are:"
+  echo "  -h | --help               Prints this help and exits."
+  echo "  -v | --verbose            Enable verbose output"
+  echo "  -d | --debug              Enable debug output and sets drush to verbose"
+  echo "  -q | --quiet              Disable most of the output"
+  echo "                             they are missing. By dedault it just warns."
+  echo "  -n | --no                 Assumes 'no' as answer"
+  echo "  -y | --yes                Assumes 'yes' as answer"
+  echo "                             (Note: '-y' and '-n' are overriding each other, the latest parameter"
+  echo "                              passed takes priority)"
+  echo "  -f | --force              Continues even if an error occurs"
+  echo "  -x | --noop               Dry Run, do not execute the commands, just print them out (also assumes --debug)"
+  echo
+}
+
+#######################################
+# Invokes a shell command or just prints it out if in dry run mode
+#
+# Globals:
+#   DRUSH_MAKE_OPTIONS
+# Arguments:
+#   any shell command
+# Returns:
+#   result of the command execution
+#######################################
+shell_execute() {
+  if [ -n "$DRY_RUN" ]; then
+    echo "DRY RUN: $1"
+  else
+    return `$1`
+  fi
+}
+
+#######################################
+# Invokes a drush command or just prints it out if in dry run mode
+#
+# Globals:
+#   DRUSH_MAKE_OPTIONS
+# Arguments:
+#   any shell command
+# Returns:
+#   result of the command execution
+#######################################
+drush_execute() {
+  # Check for drush command
+  if [ ! -x "$DRUSH_CMD" ]; then
+    print_message error "drush command not found"
+    # In this case we exit even if "IGNORE_ERRORS" is enabled.
+    exit -10;
+  fi;
+
+  if [ -n "$DRY_RUN" ]; then
+    echo "DRY RUN: drush $1"
+  else
+    $DRUSH_CMD $DRUSH_VERBOSITY $1
+  fi
+}
+
+#######################################
+# Prints a message to the stout (or stderr) based on the current verbosity level
+# 
+# Globals:
+#   DEBUG
+#   VERBOSE
+#   QUIET
+#   IGNORE_ERRORS
+# Arguments:
+#   log_level:
+#     Valid options are: info, notice, warning and error.
+#      Any other string will be treated as 'notice' and will use the prefix '[$log_level]'
+#   message:
+#     A string containing the message to print
+# Returns:
+#   None
+#######################################
+print_message() {
+  case $1 in
+  info)
+    if [ -n "$VERBOSE" ] | [ -n "$DRY_RUN" ]; then
+      echo "$2"
+    fi
+  ;;
+
+  notice)
+    if [ -z "$QUIET" ] | [ -n "$DRY_RUN" ]; then
+      echo "$2"
+    fi
+  ;;
+
+  warning)
+    if [ -z "$QUIET" ] | [ -n "$DRY_RUN" ]; then
+      echo "[WARNING] $2" 1>&2
+    fi
+  ;;
+
+  error)
+    echo "[ERROR] $2" 1>&2
+
+    if [ -z "$IGNORE_ERRORS" ]; then
+      exit -1
+    fi
+  ;;
+
+  *)
+    if [ -z "$QUIET" ] | [ -n "$DRY_RUN" ]; then
+      echo "[$1] $2"
+    fi
+  ;;
+  esac
+}
+
+#######################################
+# Parses a given readable config file
+#
+# Globals:
+#   None
+# Arguments:
+#   file_path
+#     Path to a config file to read from
+# Returns:
+#   None
+#######################################
+parse_config_file() {
+  # ref: http://stackoverflow.com/questions/16571739/bash-parsing-variables-from-config-file
+  shopt -s extglob
+  configfile=$1
+
+  while IFS='= ' read lhs rhs
+  do
+      if [[ ! $lhs =~ ^\ *# && -n $lhs ]]; then
+          rhs="${rhs%%\#*}"    # Del in line right comments
+          rhs="${rhs%%*( )}"   # Del trailing spaces
+          rhs="${rhs%\"*}"     # Del opening string quotes 
+          rhs="${rhs#\"*}"     # Del closing string quotes 
+          declare $lhs="$rhs"
+      fi
+  done < $configfile
+}
+
+#######################################
+# Cleanup files from the backup dir
+#
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   None
+#######################################
+read_config() {
+  if [ -r "/etc/drupal_platforms.conf" ]; then
+    parse_config_file "/etc/drupal_platforms.conf"
+  fi
+
+  if [ -r "~/.drupal_platforms" ]; then
+    parse_config_file "~/.drupal_platforms"
+  fi
+}
+
+if [ $# -lt 2 ]; then
+  IGNORE_ERRORS=1
+  print_message error "You *MUST* specify an uri for the makefile and a destination directory."
+  echo "Here's how to use this script"
+  print_usage
+  exit -1
+else
+  MAKEFILE_URI="$1"
+  PLATFORM_PATH="$2"
+  shift 2
+fi
+
+while true; do
+  case ${1:-} in
+    -h | --help )             print_usage; exit;;
+
+    -v | --verbose )          VERBOSE=true; DRUSH_VERBOSITY=''; shift;;
+    -d | --debug )            DEBUG=true; VERBOSE=true; DRUSH_VERBOSITY='-v'; echo "Debug-Mode Active"; shift;;
+    -q | --quiet )            QUIET=true; shift;;
+
+    -n | --no )               DEFAULT_ANSWER='-n'; shift;;
+    -y | --yes )              DEFAULT_ANSWER='-y'; shift;;
+
+    -f | --force )            IGNORE_ERRORS=true; shift;;
+    -x | --noop )             DRY_RUN=true; VERBOSE=true; shift;;
+
+    --files-path )            COMMON_FILES_DIRECTORY="$2";
+                              if [ -z "$COMMON_FILES_DIRECTORY" ] | [ ! -d "$COMMON_FILES_DIRECTORY" ] | [ ! -w "$COMMON_FILES_DIRECTORY" ]; then
+                                print_message error "The option '--files-path' requires you to specify a valid writable directory"
+                              fi
+                              shift 2;;
+
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+print_message notice "Starting platform creation process."
+
+# Running the actual drush make command
+print_message info "Building Drupal platform in $PLATFORM_PATH"
+drush_execute "make $DRUSH_MAKE_OPTIONS $MAKEFILE_URI $PLATFORM_PATH"
+
+print_message info "Copying 'Platform Settings' file to the newly created platform."
+if [ -z "$DEFAULT_PLATFORM_SETTINGS_FILE" ] | [ ! -r "$DEFAULT_PLATFORM_SETTINGS_FILE" ]; then
+  print_message error "The 'Platform Settings' file does not exist or is not readable: $DEFAULT_PLATFORM_SETTINGS_FILE"
+fi
+shell_execute "cp $DEFAULT_PLATFORM_SETTINGS_FILE $PLATFORM_PATH/sites/platform.settings.php"
+
+# if [ -z "$DEFAULT_DRUPAL_SETTINGS_FILE" ] | [ ! -r "$DEFAULT_DRUPAL_SETTINGS_FILE" ]; then
+#   print_message error "The default drupal settings file does not exist or is not readable."
+# fi
+# shell_execute "mkdir $PLATFORM_PATH/sites/platform-example/"
+# shell_execute "cp $DEFAULT_DRUPAL_SETTINGS_FILE $PLATFORM_PATH/sites/site-example/settings.php"
+
+print_message info "Symlink-ing common files directory to the newly created platform."
+if [ ! -d "$COMMON_FILES_DIRECTORY" ]; then
+  echo "$COMMON_FILES_DIRECTORY"
+  print_message error "Given drupal files directory not found or not a directory."
+fi
+shell_execute "ln -s $COMMON_FILES_DIRECTORY $PLATFORM_PATH/sites/files"
+
+print_message OK "Command completed, you can now add sites in $PLATFORM_PATH/sites/"
+print_message OK "Consider using the $PLATFORM_PATH/sites/platform-example/settings.php file as base to setup your site"
+

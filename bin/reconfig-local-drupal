@@ -8,6 +8,7 @@ VERBOSE=
 DEBUG=
 DRUSH_VERBOSITY='-q'
 CREATE=
+UPDATE_DB=
 IGNORE_ERRORS=
 AUTOLOGIN=false
 
@@ -17,15 +18,33 @@ print_usage() {
   echo "  -v | --verbose            Enable verbose output"
   echo "  -d | --debug              Enable debug output and sets drush to verbose"
   echo "  -q | --quiet              Disable most of the output"
-  # echo "  -n | --no                 Assumes 'no' as answer"
-  # echo "  -y | --yes                Assumes 'yes' as answer"
   echo "  -c | --create-file-dir    Creates the 'files' (and 'private') directory if "
-  echo "                             they are missing. By dedault it just warns."
+  echo "                             they are missing. By dedault it just warns"
+  echo "  -u | --update-database    Runs the update-db command in drush right"
+  echo "                             after rebuild-registry"
+  echo "  -y | --yes                Assumes 'yes' to all drush confirmation messages" 
   echo "  -f | --force              Continues even if an error occurs" 
   echo "  -l | --login              Automatic Login"
   echo
 }
 
+#######################################
+# Prints a message to the stout (or stderr) based on the current verbosity level
+# 
+# Globals:
+#   DEBUG
+#   VERBOSE
+#   QUIET
+#   IGNORE_ERRORS
+# Arguments:
+#   log_level:
+#     Valid options are: info, notice, warning and error.
+#      Any other string will be treated as 'notice' and will use the prefix '[$log_level]'
+#   message:
+#     A string containing the message to print
+# Returns:
+#   None
+#######################################
 print_message() {
   case $1 in
   info)
@@ -48,12 +67,12 @@ print_message() {
     echo "[ERROR] $2" 1>&2
     echo "" 1>&2
 
-    if [ -z $IGNORE_ERRORS]; then
+    if [ -z "$IGNORE_ERRORS"]; then
       exit -1
     fi
   ;;
   *)
-    if [ -z $QUIET ]; then
+    if [ -z "$QUIET" ]; then
       echo "[$1] $2"
     fi
   ;;
@@ -68,10 +87,10 @@ while true; do
     -d | --debug )            DEBUG=true; VERBOSE=true; DRUSH_VERBOSITY='-v' shift;;
     -q | --quiet )            QUIET=true; shift;;
 
-    # -n | --no )               ASSUME_NO=true; ASSUME_YES=''; shift;;
-    # -y | --yes )              ASSUME_YES=true; ASSUME_NO=''; shift;;
-
     -c | --create-file-dir )  CREATE=true; shift;;
+    -u | --update-database )  UPDATE_DB=true; shift;;
+
+    -y | --yes )              DRUSH_ASSUME_YES='-y'; shift;;
     -f | --force )            IGNORE_ERRORS=true; shift;;
     -l | --login )            AUTOLOGIN=true; shift;;
 
@@ -87,7 +106,7 @@ if [ ! -x "$drush_cmd" ]; then
   exit -10;
 fi;
 # Add verbosity level to drush. Default is quiet
-drush_cmd="$drush_cmd $DRUSH_VERBOSITY "
+drush_cmd="$drush_cmd $DRUSH_VERBOSITY $DRUSH_ASSUME_YES"
 
 
 # Check if the platform is correctly setup
@@ -104,7 +123,7 @@ fi
 if [ ! -d "../files/$site_dir" ]; then
   print_message warning "Missing files directory in sites/files/$site_dir"
 
-  if [ -n $CREATE ]; then
+  if [ -n "$CREATE" ]; then
     `mkdir -p ../files/$site_dir/files ../files/$site_dir/private/files ../files/$site_dir/private/temp`
   fi
 fi
@@ -113,6 +132,11 @@ print_message notice "Starting cleanup process."
 
 print_message info "Rebuildilg Registry to update include paths"
 `$drush_cmd registry-rebuild`
+
+if [ $UPDATE_DB ]; then
+  print_message info "Running database updates"
+  `$drush_cmd updatedb --cache-clear=0`
+fi
 
 print_message info "Force clean cache tables"
 `$drush_cmd sql-query 'TRUNCATE TABLE cache;'`

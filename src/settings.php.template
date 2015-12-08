@@ -1,0 +1,51 @@
+<?php
+/**
+ * TODO: Base info about this file and its structure. 
+ *
+ * @author Marlon Saglia
+ */
+
+// Set the local hostname for this site, this option is mostly used to generate
+//  the local public+private files
+$host = 'example.media.dev';
+// Set the real hostname of the site, it will be used for stage_file_proxy
+//  set it to any "false" value to disable it.
+$real_host = 'example.com';
+// This is used if the files are not in the typical
+// structure: sites/{$real_host}/files but in a sites/{$real_host_directory}/files
+// $real_host_directory = 'live.example.com'
+// Set the name of the site (the real one)
+$site_name = "This is My New Site";
+// if $db_name starts with 'ramsalt_' there's no need for changing db user
+// since there's a user `ramsalt` that can access al DBs with that pattern
+$db_name = 'ramsalt_example';
+
+// Set this if *ONLY* you're using a custom database config,
+// but note that in te 99% of the cases there's no need to do that!
+// $db_host = '';
+// $default_db_user = '';
+// $default_db_password = '';
+
+// Set only if needed, a default value will be given in the platform.settings
+// $custom_theme = '';
+
+// Uncomment the next line to enable theme debugging output.
+// More info: https://www.drupal.org/node/223440#theme-debug
+// $enable_theme_debug = TRUE;
+
+// if your online host (in this config: $real_host) has an authentication you sould set here the info
+// using the format: username:password
+// $real_host_access = 'username:password';
+
+
+/**
+ * Your Data
+ * In theory this data is shared among all the local config files
+ */
+$your_email = 'address@example.com';
+
+// ...and here's the real magic. ;)
+require_once dirname(__FILE__).'/../platform.settings.php';
+
+// Other Stuff and overrides, if you REEEALY need to override some settings, this is the place where to do it!
+
