@@ -8,6 +8,7 @@ VERBOSE=
 DEBUG=
 DRUSH_VERBOSITY='-q'
 CREATE=
+UPDATE_DB=
 IGNORE_ERRORS=
 AUTOLOGIN=false
 
@@ -18,7 +19,9 @@ print_usage() {
   echo "  -d | --debug              Enable debug output and sets drush to verbose"
   echo "  -q | --quiet              Disable most of the output"
   echo "  -c | --create-file-dir    Creates the 'files' (and 'private') directory if "
-  echo "                             they are missing. By dedault it just warns."
+  echo "                             they are missing. By dedault it just warns"
+  echo "  -u | --update-database    Runs the update-db command in drush right"
+  echo "                             after rebuild-registry"
   echo "  -y | --yes                Assumes 'yes' to all drush confirmation messages" 
   echo "  -f | --force              Continues even if an error occurs" 
   echo "  -l | --login              Automatic Login"
@@ -85,6 +88,7 @@ while true; do
     -q | --quiet )            QUIET=true; shift;;
 
     -c | --create-file-dir )  CREATE=true; shift;;
+    -u | --update-database )  UPDATE_DB=true; shift;;
 
     -y | --yes )              DRUSH_ASSUME_YES='-y'; shift;;
     -f | --force )            IGNORE_ERRORS=true; shift;;
@@ -128,6 +132,11 @@ print_message notice "Starting cleanup process."
 
 print_message info "Rebuildilg Registry to update include paths"
 `$drush_cmd registry-rebuild`
+
+if [ $UPDATE_DB ]; then
+  print_message info "Running database updates"
+  `$drush_cmd updatedb --cache-clear=0`
+fi
 
 print_message info "Force clean cache tables"
 `$drush_cmd sql-query 'TRUNCATE TABLE cache;'`
