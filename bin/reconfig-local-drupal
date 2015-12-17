@@ -158,7 +158,7 @@ print_message info "Use devel as default mailsystem destination "
 
 
 print_message notice "Enabling Development Modules"
-`$drush_cmd pm-enable -y devel stage_file_proxy maillog`
+`$drush_cmd pm-enable -y devel search_krumo stage_file_proxy maillog`
 
 # This shlould be on your settings.php!
 # Uncomment the next lines to extra safety.
