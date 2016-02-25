@@ -75,6 +75,9 @@ $conf['cron_safe_threshold'] = 0;
 // Enable theme debug if required.
 $conf['theme_debug'] = isset($enable_theme_debug) ? $enable_theme_debug : FALSE;
 
+// Allow any number of shortcuts by default.
+$conf['shortcut_max_slots'] = 50;
+
 $default_theme = ( !empty($custom_theme) ) ? $custom_theme : 'ramsalt_media';
 $conf['htmlmail_theme'] = $default_theme;
 $conf['mailsystem_theme'] = $default_theme;
