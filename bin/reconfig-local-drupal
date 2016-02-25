@@ -124,41 +124,41 @@ if [ ! -d "../files/$site_dir" ]; then
   print_message warning "Missing files directory in sites/files/$site_dir"
 
   if [ -n "$CREATE" ]; then
-    `mkdir -p ../files/$site_dir/files ../files/$site_dir/private/files ../files/$site_dir/private/temp`
+    mkdir -p ../files/$site_dir/files ../files/$site_dir/private/files ../files/$site_dir/private/temp
   fi
 fi
 
 print_message notice "Starting cleanup process."
 
 print_message info "Rebuildilg Registry to update include paths"
-`$drush_cmd registry-rebuild`
+$drush_cmd registry-rebuild
 
 if [ $UPDATE_DB ]; then
   print_message info "Running database updates"
-  `$drush_cmd updatedb --cache-clear=0`
+  $drush_cmd updatedb --cache-clear=0
 fi
 
-print_message info "Force clean cache tables"
-`$drush_cmd sql-query 'TRUNCATE TABLE cache;'`
-`$drush_cmd sql-query 'TRUNCATE TABLE cache_menu;'`
-`$drush_cmd sql-query 'TRUNCATE TABLE cache_views;'`
+print_message notice "Force clean cache tables"
+$drush_cmd sql-query 'TRUNCATE TABLE cache;'
+$drush_cmd sql-query 'TRUNCATE TABLE cache_menu;'
+$drush_cmd sql-query 'TRUNCATE TABLE cache_views;'
 
-`$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_file;'`
-`$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_node;'`
-`$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_taxonomy_term;'`
+$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_file;'
+$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_node;'
+$drush_cmd sql-query 'TRUNCATE TABLE cache_entity_taxonomy_term;'
 
 print_message info "Disabling caching modules"
-`$drush_cmd pm-disable -y memcache memcache_admin varnish advagg apc_status render_cache apc expire`
+$drush_cmd pm-disable -y memcache memcache_admin varnish advagg apc_status render_cache apc expire
 
 print_message info "Disabling SMTP"
-`$drush_cmd variable-set smtp_on 0`
+$drush_cmd variable-set smtp_on 0
 
 print_message info "Use devel as default mailsystem destination "
-`$drush_cmd variable-set mail_system '{"default-system":"DevelMailLog"}' --format=json`
+$drush_cmd variable-set mail_system '{"default-system":"DevelMailLog"}' --format=json
 
 
-print_message notice "Enabling Development Modules"
-`$drush_cmd pm-enable -y devel search_krumo stage_file_proxy maillog`
+print_message info "Enabling Development Modules"
+$drush_cmd pm-enable -y devel search_krumo stage_file_proxy maillog
 
 # This shlould be on your settings.php!
 # Uncomment the next lines to extra safety.
@@ -171,12 +171,12 @@ print_message notice "Enabling Development Modules"
 #`$drush_cmd variable-set preprocess_css 0`
 #`$drush_cmd variable-set preprocess_js 0`
 
-print_message notice "Clean sessions table"
-`$drush_cmd sql-query 'TRUNCATE TABLE sessions;'`
+print_message info "Clean sessions table"
+$drush_cmd sql-query 'TRUNCATE TABLE sessions;'
 
 if $AUTOLOGIN; then
-  print_message notice "Loggin into the local site"
-  echo `$drush_cmd user-login 1`
+  print_message info "Loggin into the local site"
+  $drush_cmd user-login 1
 fi
 
 print_message OK "Command completed!"
