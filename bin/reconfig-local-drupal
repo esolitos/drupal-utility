@@ -1,6 +1,6 @@
 #!/bin/sh
 
-drush_cmd=`which drush`
+drush_cmd_raw=`which drush`
 site_dir=${PWD##*/}
 
 QUIET=
@@ -100,13 +100,13 @@ while true; do
 done
 
 # Check for drush command
-if [ ! -x "$drush_cmd" ]; then
+if [ ! -x "$drush_cmd_raw" ]; then
   print_message error "drush command not found"
   # In this case we exit even if "IGNORE_ERRORS" is enabled.
   exit -10;
 fi;
 # Add verbosity level to drush. Default is quiet
-drush_cmd="$drush_cmd $DRUSH_VERBOSITY $DRUSH_ASSUME_YES"
+drush_cmd="$drush_cmd_raw $DRUSH_VERBOSITY $DRUSH_ASSUME_YES"
 
 
 # Check if the platform is correctly setup
@@ -179,7 +179,7 @@ $drush_cmd sql-query 'TRUNCATE TABLE sessions;'
 
 if $AUTOLOGIN; then
   print_message info "Loggin into the local site"
-  $drush_cmd user-login 1
+  $drush_cmd_raw user-login admin/content --uid=1
 fi
 
 print_message OK "Command completed!"
