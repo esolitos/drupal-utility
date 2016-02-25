@@ -153,6 +153,9 @@ $drush_cmd pm-disable -y memcache memcache_admin varnish advagg apc_status rende
 print_message info "Disabling SMTP"
 $drush_cmd variable-set smtp_on 0
 
+print_message info "Setting Search API Solr indexes to readonly mode"
+$drush_cmd sql-query 'UPDATE search_api_index SET read_only = 1 WHERE server IN ( SELECT machine_name FROM search_api_server WHERE class NOT LIKE "search_api_db_service" );'
+
 print_message info "Use devel as default mailsystem destination "
 $drush_cmd variable-set mail_system '{"default-system":"DevelMailLog"}' --format=json
 
