@@ -1,0 +1,64 @@
+#!/bin/bash
+
+script=`basename "$0"`
+drupal_root=${PWD}
+default_site_dir="$drupal_root/sites/default"
+new_site="$1"
+
+if [ "$new_site" = 'help' ] || [ "$new_site" = '-h' ]; then
+  echo "Usage: $script [site-name.tld]"
+  echo "    You will be prompted for a site if not specified."
+  exit;
+fi
+
+# Dumb way to determine if we're in a drupal root directory.
+if [ -e "$drupal_root/index.php" ] && [ -e "$drupal_root/sites" ]; then
+  
+  # If no site parameter or if invalid parameter, let\'s ask the user 
+  if [ -z $new_site ] || [ ! -d "$drupal_root/sites/$new_site" ]; then
+    # Get list of the availabel sites
+    # (assumed to be directories under the "DRUPAL_ROOT/sites")
+    cd "$drupal_root/sites/";
+    sites_names=`ls -d */ | grep -v default`
+    sites_list=($sites_names)
+
+    echo "You have not specified a valid site."
+    PS3='Select a site: '
+    select site in "${sites_list[@]}"
+    do
+      if [ -n "$site" ] && [ -d "$site" ]; then
+        echo "Selectd site: $site"
+        new_site="$site"
+        break
+      else
+        echo "Invalid choice, select another."
+      fi
+    done
+
+    # Go back to the drupal root
+    cd "$drupal_root"
+  fi
+
+  # Move original "default" directory or remove the symlink
+  if [ -d "$default_site_dir" ] && [ ! -h "$default_site_dir" ]; then
+    echo 'Moving original "sites/default" directory.'
+    mv "$default_site_dir" "$default_site_dir.orig"
+  elif [ -h "$default_site_dir" ]; then
+    echo 'Removing symlinked "sites/default"'
+    rm "$default_site_dir"
+  fi
+
+  # Create the symlink
+  cd "$drupal_root/sites/";
+  ln -s "$new_site" 'default'
+  if [ $? -eq 0 ]; then
+    echo 'Successfully linked new site'
+  else
+    echo 'ERROR: Symlink not created successfully'
+  fi
+
+  # Go back to the drupal root
+  cd "$drupal_root"
+else
+  echo "The directory $drupal_root doesn't seems to be a Drupal root: Aborting!";
+fi
