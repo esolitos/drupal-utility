@@ -186,11 +186,11 @@ parse_config_file() {
 #   None
 #######################################
 read_config() {
-  if [ -r "/etc/drupal_platforms.conf" ]; then
+  if [ -r /etc/drupal_platforms.conf ]; then
     parse_config_file "/etc/drupal_platforms.conf"
   fi
 
-  if [ -r "~/.drupal_platforms" ]; then
+  if [ -r ~/.drupal_platforms ]; then
     parse_config_file "~/.drupal_platforms"
   fi
 }
